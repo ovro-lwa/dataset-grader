@@ -11,11 +11,10 @@ export GRADER_DB_PATH="${GRADER_DB_PATH:-$ROOT/data/grader.sqlite}"
 HOST="${GRADER_HOST:-localhost}"
 PORT="${GRADER_PORT:-8765}"
 
-PYTHON="${ROOT}/.venv/bin/python"
 PANEL="${ROOT}/.venv/bin/panel"
 if [[ ! -x "$PANEL" ]]; then
-  PYTHON="python3"
-  PANEL="panel"
+  echo "Missing $ROOT/.venv — run ./scripts/setup.sh first (Python 3.10+)." >&2
+  exit 1
 fi
 
 echo "Dataset grader: http://${HOST}:${PORT}/app"

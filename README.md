@@ -4,15 +4,18 @@ Collaborative web app for grading datasets by **day**, **LST**, and **frequency*
 
 ## Quick start
 
+Requires **Python 3.10+** (uses a project-local `.venv`, not `fasttransients` or system 3.6).
+
 ```bash
-cd /Users/claw/code/dataset-grader
-python3 -m venv .venv
+cd /path/to/dataset-grader
+./scripts/setup.sh    # prefers python3.11 / python3.10 on PATH
 source .venv/bin/activate
-pip install -e ".[dev]"
 
 export GRADER_MANIFEST="$(pwd)/example/manifest.csv"
 ./scripts/serve.sh
 ```
+
+On **lwacalim**, `/usr/bin/python3.11` satisfies this; `conda activate fasttransients` (3.9) is too old for the current code.
 
 If `GRADER_MANIFEST` is unset, the app uses `example/manifest.csv` when that file exists.
 
@@ -116,7 +119,8 @@ Example: `data/2024-12-28/08h/74MHz.png`
 ## Tests
 
 ```bash
-pip install -e ".[dev]"
+./scripts/setup.sh
+source .venv/bin/activate
 pytest
 ```
 

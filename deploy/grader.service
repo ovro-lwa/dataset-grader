@@ -1,0 +1,28 @@
+[Unit]
+Description=Dataset Grader
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Run as the specified user
+Type=simple
+
+# Allow unlimited locked memory
+LimitMEMLOCK=infinity
+
+# Logging
+# StandardOutput=syslog
+# StandardError=syslog
+# SyslogIdentifier=obsstate
+
+# Setup the environment
+Environment=GRADER_MANIFEST=/home/pipeline/proj/dataset-grader/data/phase2_manifest.csv
+WorkingDirectory=/home/pipeline/proj/dataset-grader
+ExecStart=/bin/bash -ec "source .venv/bin/activate && ./scripts/serve.sh"
+
+#Restart=always
+#RestartSec=10
+#StartLimitBurst=3
+
+[Install]
+WantedBy=multi-user.target
