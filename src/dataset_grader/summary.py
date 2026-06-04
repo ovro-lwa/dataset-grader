@@ -48,8 +48,8 @@ def build_catalog_summary_plot(
     figure_kwargs: dict = {
         "title": title,
         "height": height,
-        "x_axis_label": "Day",
-        "y_axis_label": "LST",
+        "x_axis_label": "LST",
+        "y_axis_label": "Day",
         "sizing_mode": "scale_width",
     }
     if width is not None:
@@ -98,8 +98,8 @@ def build_catalog_summary_plot(
     for day in day_labels:
         for lst in lst_labels:
             count, subbands = lookup.get((day, lst), (0, ""))
-            xs.append(_cell_center(day_index[day]))
-            ys.append(_cell_center(lst_index[lst]))
+            xs.append(_cell_center(lst_index[lst]))
+            ys.append(_cell_center(day_index[day]))
             counts.append(count)
             if count == 0:
                 hovers.append(f"Day {day}\nLST {lst}\nDatasets: 0\nSubbands: (none)")
@@ -108,28 +108,37 @@ def build_catalog_summary_plot(
                     f"Day {day}\nLST {lst}\nDatasets: {count}\nSubbands: {subbands}"
                 )
 
+    cell_days: list[str] = []
+    cell_lsts: list[str] = []
+    for day in day_labels:
+        for lst in lst_labels:
+            cell_days.append(day)
+            cell_lsts.append(lst)
+
     source = ColumnDataSource(
         data={
             "x": xs,
             "y": ys,
             "count": counts,
             "hover_text": hovers,
-            "day": [day_labels[int(x)] for x in xs],
-            "lst": [lst_labels[int(y)] for y in ys],
+            "day": cell_days,
+            "lst": cell_lsts,
         }
     )
 
     max_count = max(counts) if counts else 1
+    # White at zero datasets; blue ramp for 1..max
+    palette = ["#ffffff", *list(Blues256[:255])]
     color_mapper = LinearColorMapper(
-        palette=Blues256,
+        palette=palette,
         low=0,
         high=max(max_count, 1),
     )
 
     plot = figure(
         **figure_kwargs,
-        x_range=(0, n_days),
-        y_range=(0, n_lst),
+        x_range=(0, n_lst),
+        y_range=(0, n_days),
         tools="reset",
         toolbar_location="above",
     )
@@ -161,14 +170,13 @@ def build_catalog_summary_plot(
         )
     )
 
-    x_ticks, x_overrides = _axis_ticks(n_days, day_labels)
-    y_ticks, y_overrides = _axis_ticks(n_lst, lst_labels)
+    x_ticks, x_overrides = _axis_ticks(n_lst, lst_labels)
+    y_ticks, y_overrides = _axis_ticks(n_days, day_labels)
     plot.xaxis.ticker = FixedTicker(ticks=x_ticks)
     plot.yaxis.ticker = FixedTicker(ticks=y_ticks)
     plot.xaxis.major_label_overrides = x_overrides
     plot.yaxis.major_label_overrides = y_overrides
-    plot.xaxis.axis_label = "Day"
-    plot.yaxis.axis_label = "LST"
-    plot.xaxis.major_label_orientation = 0.8
+    plot.xaxis.axis_label = "LST"
+    plot.yaxis.axis_label = "Day"
 
     return plot

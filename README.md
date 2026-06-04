@@ -56,9 +56,9 @@ The app shows a dropdown of these names; free-text names are not accepted.
 
 ### Catalog summary plot
 
-The app shows a **Catalog summary** heatmap above the grading grids: cell color is the
-number of datasets (subbands) for each day × LST pair. Hover a cell to see the
-subband names (frequencies) available that day.
+The app shows a **Catalog summary** heatmap: LST on the horizontal axis, day on the
+vertical axis, white cells where no data exist, and darker blue for more subbands.
+Hover a cell to see the subband names (frequencies) available that day.
 
 ### Grading
 
