@@ -21,9 +21,10 @@ def count_to_fill_color(count: int, max_count: int = MAX_SUBBAND_COUNT) -> str:
         return EMPTY_FILL
     capped = min(count, max_count)
     if max_count <= 1:
-        return Blues256[128]
+        return Blues256[-1]
+    # Blues256 runs dark→light by index; invert so low counts are light.
     idx = int((capped - 1) / (max_count - 1) * (len(Blues256) - 1))
-    return Blues256[idx]
+    return Blues256[(len(Blues256) - 1) - idx]
 
 
 def _format_subbands(frequencies: pd.Series) -> str:

@@ -11,10 +11,10 @@ def test_count_to_fill_color_orders_light_to_dark():
     light = count_to_fill_color(1, 5)
     dark = count_to_fill_color(5, 5)
     assert light != dark
-    # Blues256 increases in darkness with index
     from bokeh.palettes import Blues256
 
-    assert Blues256.index(light) < Blues256.index(dark)
+    # In Bokeh's Blues256, higher index is lighter blue.
+    assert Blues256.index(light) > Blues256.index(dark)
 
 
 def test_count_to_fill_color_zero_is_white():
