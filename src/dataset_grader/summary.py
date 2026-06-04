@@ -12,15 +12,17 @@ from dataset_grader.grids import _axis_ticks, _cell_center, _freq_sort_key, _lst
 EMPTY_FILL = "#ffffff"
 NONEMPTY_EDGE = "#424242"
 NONEMPTY_EDGE_WIDTH = 0.5
+MAX_SUBBAND_COUNT = 15
 
 
-def count_to_fill_color(count: int, max_count: int) -> str:
-    """Map subband count to fill: white at 0, light→dark blue for 1..max."""
+def count_to_fill_color(count: int, max_count: int = MAX_SUBBAND_COUNT) -> str:
+    """Map subband count to fill: white at 0, light→dark blue for 1..max (capped)."""
     if count <= 0:
         return EMPTY_FILL
+    capped = min(count, max_count)
     if max_count <= 1:
         return Blues256[128]
-    idx = int((count - 1) / (max_count - 1) * (len(Blues256) - 1))
+    idx = int((capped - 1) / (max_count - 1) * (len(Blues256) - 1))
     return Blues256[idx]
 
 
@@ -127,15 +129,13 @@ def build_catalog_summary_plot(
     fill_colors: list[str] = []
     line_colors: list[str] = []
     line_widths: list[float] = []
-    max_count = max((c for c in counts if c > 0), default=1)
-
     for day in day_labels:
         for lst in lst_labels:
             cell_days.append(day)
             cell_lsts.append(lst)
 
     for count in counts:
-        fill_colors.append(count_to_fill_color(count, max_count))
+        fill_colors.append(count_to_fill_color(count))
         if count > 0:
             line_colors.append(NONEMPTY_EDGE)
             line_widths.append(NONEMPTY_EDGE_WIDTH)

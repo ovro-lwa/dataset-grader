@@ -21,6 +21,14 @@ def test_count_to_fill_color_zero_is_white():
     assert count_to_fill_color(0, 10) == "#ffffff"
 
 
+def test_count_to_fill_color_caps_at_max():
+    from dataset_grader.summary import MAX_SUBBAND_COUNT
+
+    at_max = count_to_fill_color(MAX_SUBBAND_COUNT)
+    above_max = count_to_fill_color(MAX_SUBBAND_COUNT + 10)
+    assert at_max == above_max
+
+
 def test_catalog_summary_table():
     catalog = pd.DataFrame(
         [
