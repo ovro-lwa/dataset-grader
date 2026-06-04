@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import pandas as pd
 import panel as pn
 import param
 from bokeh.plotting import figure
@@ -21,6 +22,7 @@ from dataset_grader.grids import (
     update_consensus_grid_colors,
     update_personal_grid_colors,
 )
+from dataset_grader.summary import build_catalog_summary_plot
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +89,6 @@ class DatasetGraderApp(param.Parameterized):
         self._reviewer_names = load_user_names(self._config.users_path)
         self._db = GraderDatabase(self._config.db_path)
         self._db.initialize()
-        self._sync_catalog()
         self._personal_plot: figure | None = None
         self._consensus_plot: figure | None = None
         self._geometry: GridGeometry | None = None
@@ -95,25 +96,35 @@ class DatasetGraderApp(param.Parameterized):
             name="Reviewer",
             options=self._reviewer_names,
             value=self._reviewer_names[0],
-            width=220,
+            sizing_mode="stretch_width",
         )
-        self._register_button = pn.widgets.Button(name="Sign in", button_type="primary")
+        self._register_button = pn.widgets.Button(
+            name="Sign in",
+            button_type="primary",
+            sizing_mode="stretch_width",
+        )
         self._register_button.on_click(self._on_register)
         self._refresh_catalog_button = pn.widgets.Button(
             name="Refresh catalog",
             button_type="default",
+            sizing_mode="stretch_width",
         )
         self._refresh_catalog_button.on_click(self._on_refresh_catalog)
         self._status = pn.pane.Markdown("")
         self._hint = pn.pane.Markdown(
-            "_Click a cell in your grid to cycle grade: "
-            "**unset → pass → fail → retry → unset**_\n\n"
-            "**Refresh catalog** re-reads your manifest or data directory and adds any "
-            "new (day, LST, frequency) cells to the database. It does not remove old "
-            "cells or delete anyone's grades."
+            "**Grading:** click a grid cell to cycle "
+            "_unset → pass → fail → retry → unset_.\n\n"
+            "**Refresh catalog:** re-scan the manifest or data tree; "
+            "adds new cells only (keeps existing grades)."
+        )
+        self._summary_pane = pn.pane.Bokeh(
+            figure(),
+            sizing_mode="stretch_width",
+            styles={"min-height": "320px"},
         )
         self._personal_pane = pn.pane.Bokeh(figure(), sizing_mode="stretch_width")
         self._consensus_pane = pn.pane.Bokeh(figure(), sizing_mode="stretch_width")
+        self._catalog, _ = self._sync_catalog()
         days = self._db.list_days()
         if days:
             self.param.day.objects = days
@@ -122,10 +133,19 @@ class DatasetGraderApp(param.Parameterized):
         if pn.state.curdoc is not None:
             pn.state.add_periodic_callback(self._refresh_consensus, period=5000)
 
-    def _sync_catalog(self) -> None:
+    def _sync_catalog(self) -> tuple[pd.DataFrame, int]:
         catalog = discover_catalog(self._config)
         count = self._db.sync_datasets(catalog)
         logger.info("Synced %s dataset rows from discovery", count)
+        self._catalog = catalog
+        self._update_summary_plot()
+        return catalog, count
+
+    def _update_summary_plot(self) -> None:
+        self._summary_pane.object = build_catalog_summary_plot(
+            self._catalog,
+            title="Catalog summary (datasets per day × LST)",
+        )
 
     def _on_register(self, _event=None) -> None:
         try:
@@ -139,8 +159,7 @@ class DatasetGraderApp(param.Parameterized):
         self._rebuild_view()
 
     def _on_refresh_catalog(self, _event=None) -> None:
-        catalog = discover_catalog(self._config)
-        count = self._db.sync_datasets(catalog)
+        catalog, count = self._sync_catalog()
         days = self._db.list_days()
         self.param.day.objects = days
         if days and self.day not in days:
@@ -232,36 +251,46 @@ class DatasetGraderApp(param.Parameterized):
     def view(self) -> pn.Column:
         user = _get_session_user()
         header = pn.pane.Markdown(
-            "# Dataset grader\n"
-            "Choose your name from the list, sign in, pick a day, then **click cells** "
-            "in your grid to cycle grades (unset → pass → fail → retry). "
-            "The lower grid shows everyone's scores."
+            "## Dataset grader\n"
+            "Sign in, pick a day, then grade cells below. "
+            "Consensus grid shows all reviewers."
         )
-        register_row = pn.Row(
+        user_line = (
+            pn.pane.Markdown(f"**Signed in:** {user.name}")
+            if user
+            else pn.pane.Markdown("_Not signed in_")
+        )
+        day_param = pn.Param(
+            self.param.day,
+            widgets={"day": pn.widgets.Select},
+            show_name=True,
+            name="Day",
+        )
+        controls = pn.Column(
+            header,
             self._user_select,
             self._register_button,
             self._refresh_catalog_button,
-        )
-        user_line = (
-            pn.pane.Markdown(f"Signed in as **{user.name}**.")
-            if user
-            else pn.pane.Markdown("_Not registered_")
-        )
-        day_row = pn.Row(
-            pn.Param(
-                self.param.day,
-                widgets={"day": pn.widgets.Select},
-                show_name=True,
-                name="Day",
-            ),
-        )
-        main = pn.Column(
-            header,
-            register_row,
             user_line,
+            day_param,
             self._hint,
             self._status,
-            day_row,
+            sizing_mode="stretch_width",
+            styles={"flex": "1", "min-width": "0"},
+        )
+        summary_panel = pn.Column(
+            pn.pane.Markdown("### Catalog summary"),
+            self._summary_pane,
+            sizing_mode="stretch_width",
+            styles={"flex": "1", "min-width": "0"},
+        )
+        top_row = pn.Row(
+            controls,
+            summary_panel,
+            sizing_mode="stretch_width",
+        )
+        main = pn.Column(
+            top_row,
             pn.pane.Markdown("### Your grading grid"),
             self._personal_pane,
             pn.pane.Markdown("### Consensus (hover for details)"),

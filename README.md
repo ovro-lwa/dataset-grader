@@ -54,6 +54,12 @@ Edit [config/users.json](config/users.json) (or set `GRADER_USERS_FILE`) to list
 
 The app shows a dropdown of these names; free-text names are not accepted.
 
+### Catalog summary plot
+
+The app shows a **Catalog summary** heatmap above the grading grids: cell color is the
+number of datasets (subbands) for each day × LST pair. Hover a cell to see the
+subband names (frequencies) available that day.
+
 ### Grading
 
 Click a cell in your grid to cycle: **unset → pass → fail → retry → unset**. Choosing unset removes your grade for that cell from the database.
