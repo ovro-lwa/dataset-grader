@@ -42,7 +42,7 @@ def build_catalog_summary_plot(
     *,
     title: str = "Datasets per day and LST",
     width: int | None = None,
-    height: int = 320,
+    height: int = 640,
 ) -> figure:
     """Heatmap of dataset counts; hover lists subband (frequency) names."""
     figure_kwargs: dict = {
@@ -126,9 +126,9 @@ def build_catalog_summary_plot(
         }
     )
 
-    max_count = max(counts) if counts else 1
-    # White at zero datasets; blue ramp for 1..max
-    palette = ["#ffffff", *list(Blues256[:255])]
+    max_count = max((c for c in counts if c > 0), default=1)
+    # White at zero; darkest blue at highest subband count
+    palette = ["#ffffff", *list(Blues256[64:])]
     color_mapper = LinearColorMapper(
         palette=palette,
         low=0,
@@ -145,24 +145,24 @@ def build_catalog_summary_plot(
     plot.rect(
         x="x",
         y="y",
-        width=0.95,
-        height=0.95,
+        width=1.0,
+        height=1.0,
         source=source,
         fill_color={"field": "count", "transform": color_mapper},
-        line_color="#424242",
-        line_width=0.5,
+        line_width=0,
     )
     hover_renderer = plot.rect(
         x="x",
         y="y",
-        width=0.95,
-        height=0.95,
+        width=1.0,
+        height=1.0,
         source=source,
         fill_alpha=0,
-        line_alpha=0,
+        line_width=0,
         hover_fill_alpha=0,
         hover_line_alpha=0,
     )
+    plot.grid.grid_line_color = None
     plot.add_tools(
         HoverTool(
             renderers=[hover_renderer],

@@ -120,7 +120,7 @@ class DatasetGraderApp(param.Parameterized):
         self._summary_pane = pn.pane.Bokeh(
             figure(),
             sizing_mode="stretch_width",
-            styles={"min-height": "320px"},
+            styles={"min-height": "640px"},
         )
         self._personal_pane = pn.pane.Bokeh(figure(), sizing_mode="stretch_width")
         self._consensus_pane = pn.pane.Bokeh(figure(), sizing_mode="stretch_width")
@@ -145,6 +145,7 @@ class DatasetGraderApp(param.Parameterized):
         self._summary_pane.object = build_catalog_summary_plot(
             self._catalog,
             title="Catalog summary (datasets per day × LST)",
+            height=640,
         )
 
     def _on_register(self, _event=None) -> None:
