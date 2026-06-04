@@ -52,6 +52,8 @@ def load_user_names(path: Path) -> list[str]:
 
 def ensure_allowed_user(name: str, allowed: list[str]) -> str:
     trimmed = name.strip()
+    if not trimmed:
+        raise ValueError("Select a reviewer from the list before signing in.")
     if trimmed not in allowed:
         raise ValueError(
             f"Reviewer {trimmed!r} is not in the configured list "

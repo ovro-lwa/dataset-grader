@@ -94,8 +94,8 @@ class DatasetGraderApp(param.Parameterized):
         self._geometry: GridGeometry | None = None
         self._user_select = pn.widgets.Select(
             name="Reviewer",
-            options=self._reviewer_names,
-            value=self._reviewer_names[0],
+            options={"": "— select reviewer —", **{n: n for n in self._reviewer_names}},
+            value="",
             sizing_mode="stretch_width",
         )
         self._register_button = pn.widgets.Button(
@@ -111,11 +111,12 @@ class DatasetGraderApp(param.Parameterized):
         )
         self._refresh_catalog_button.on_click(self._on_refresh_catalog)
         self._status = pn.pane.Markdown("")
-        self._hint = pn.pane.Markdown(
-            "**Grading:** click a grid cell to cycle "
-            "_unset → pass → fail → retry → unset_.\n\n"
-            "**Refresh catalog:** re-scan the manifest or data tree; "
-            "adds new cells only (keeps existing grades)."
+        self._hint = pn.pane.Markdown(self._hint_text(signed_in=False))
+        self._day_param = pn.Param(
+            self.param.day,
+            widgets={"day": pn.widgets.Select},
+            show_name=True,
+            name="Day",
         )
         self._summary_pane = pn.pane.Bokeh(
             figure(),
@@ -141,6 +142,25 @@ class DatasetGraderApp(param.Parameterized):
         self._update_summary_plot()
         return catalog, count
 
+    @staticmethod
+    def _hint_text(*, signed_in: bool) -> str:
+        if signed_in:
+            grading = (
+                "**Grading:** click a grid cell to cycle "
+                "_unset → pass → fail → retry → unset_."
+            )
+        else:
+            grading = "**Grading:** sign in above before changing cell grades."
+        return (
+            f"{grading}\n\n"
+            "**Refresh catalog:** re-scan the manifest or data tree; "
+            "adds new cells only (keeps existing grades)."
+        )
+
+    def _update_auth_ui(self) -> None:
+        signed_in = _get_session_user() is not None
+        self._hint.object = self._hint_text(signed_in=signed_in)
+
     def _update_summary_plot(self) -> None:
         self._summary_pane.object = build_catalog_summary_plot(
             self._catalog,
@@ -156,7 +176,8 @@ class DatasetGraderApp(param.Parameterized):
             self._status.object = f"**Error:** {exc}"
             return
         _set_session_user(user)
-        self._status.object = f"Signed in as **{user.name}**."
+        self._status.object = f"Signed in as **{user.name}**. You can grade cells now."
+        self._update_auth_ui()
         self._rebuild_view()
 
     def _on_refresh_catalog(self, _event=None) -> None:
@@ -178,7 +199,10 @@ class DatasetGraderApp(param.Parameterized):
 
     def _on_cell_tap(self, dataset_id: int) -> None:
         user = _get_session_user()
-        if user is None or self.day is None:
+        if user is None:
+            self._status.object = "**Sign in required** before grading cells."
+            return
+        if self.day is None:
             return
         grades = self._db.grades_for_user_day(user.id, self.day)
         current = grades.get(dataset_id)
@@ -219,25 +243,22 @@ class DatasetGraderApp(param.Parameterized):
 
     def _rebuild_view(self) -> None:
         user = _get_session_user()
-        if user is None or self.day is None:
-            self._personal_pane.object = figure(width=700, height=200, title="Select a day after registering")
+        if self.day is None:
+            self._personal_pane.object = figure(
+                width=700,
+                height=200,
+                title="Sign in and select a day to grade",
+            )
             self._consensus_pane.object = figure(width=700, height=200)
             return
         datasets = self._db.datasets_for_day(self.day)
         if datasets.empty:
             self._personal_pane.object = figure(
-                width=700, height=200, title=f"No datasets for {self.day}"
+                width=700, height=200, title=f"No datasets for {self.day}",
             )
             self._consensus_pane.object = figure(width=700, height=200)
             return
         self._geometry = GridGeometry.from_datasets(datasets)
-        grades = self._db.grades_for_user_day(user.id, self.day)
-        self._personal_plot = build_personal_grid(
-            self._geometry,
-            grades,
-            on_tap=self._on_cell_tap,
-            title=f"Your grades — {self.day}",
-        )
         grades_df = self._db.all_grades_for_day(self.day)
         by_ds = grades_by_dataset_from_df(grades_df)
         self._consensus_plot = build_consensus_grid(
@@ -245,8 +266,26 @@ class DatasetGraderApp(param.Parameterized):
             by_ds,
             title=f"All reviewers — {self.day}",
         )
-        self._personal_pane.object = self._personal_plot
         self._consensus_pane.object = self._consensus_plot
+
+        if user is None:
+            self._personal_plot = None
+            self._personal_pane.object = figure(
+                width=700,
+                height=200,
+                title="Sign in to grade cells",
+            )
+            return
+
+        grades = self._db.grades_for_user_day(user.id, self.day)
+        self._personal_plot = build_personal_grid(
+            self._geometry,
+            grades,
+            on_tap=self._on_cell_tap,
+            grading_enabled=True,
+            title=f"Your grades — {self.day}",
+        )
+        self._personal_pane.object = self._personal_plot
 
     @property
     def view(self) -> pn.Column:
@@ -261,19 +300,13 @@ class DatasetGraderApp(param.Parameterized):
             if user
             else pn.pane.Markdown("_Not signed in_")
         )
-        day_param = pn.Param(
-            self.param.day,
-            widgets={"day": pn.widgets.Select},
-            show_name=True,
-            name="Day",
-        )
         controls = pn.Column(
             header,
             self._user_select,
             self._register_button,
             self._refresh_catalog_button,
             user_line,
-            day_param,
+            self._day_param,
             self._hint,
             self._status,
             sizing_mode="stretch_width",
@@ -298,8 +331,8 @@ class DatasetGraderApp(param.Parameterized):
             self._consensus_pane,
             sizing_mode="stretch_width",
         )
-        if user is not None:
-            self._rebuild_view()
+        self._update_auth_ui()
+        self._rebuild_view()
         return main
 
 

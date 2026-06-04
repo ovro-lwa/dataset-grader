@@ -34,5 +34,7 @@ def test_load_users_empty_raises(tmp_path: Path):
 def test_ensure_allowed_user():
     allowed = ["alice", "bob"]
     assert ensure_allowed_user("alice", allowed) == "alice"
+    with pytest.raises(ValueError, match="Select a reviewer"):
+        ensure_allowed_user("", allowed)
     with pytest.raises(ValueError, match="not in the configured"):
         ensure_allowed_user("eve", allowed)

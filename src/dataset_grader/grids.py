@@ -138,7 +138,8 @@ def build_personal_grid(
     geometry: GridGeometry,
     user_grades: dict[int, str],
     *,
-    on_tap: Callable[[int], None],
+    on_tap: Callable[[int], None] | None = None,
+    grading_enabled: bool = True,
     title: str = "Your grades",
 ) -> figure:
     def fill(lst: str, freq: str) -> str:
@@ -152,21 +153,26 @@ def build_personal_grid(
         if ds_id is None:
             return "No dataset"
         grade = user_grades.get(ds_id)
+        if grading_enabled:
+            action = "Click cell to cycle: unset → pass → fail → retry"
+        else:
+            action = "Sign in to grade cells"
         return (
             f"LST {lst}, {freq}\n"
             f"Your grade: {grade or 'unset'}\n"
-            "Click cell to cycle: unset → pass → fail → retry"
+            f"{action}"
         )
 
     source = _build_cell_source(geometry, fill_color=fill, hover_text=hover)
+    tools = "tap,reset" if grading_enabled and on_tap is not None else "hover,reset"
     plot = figure(
         title=title,
         width=700,
         height=400,
         x_range=(0, geometry.n_lst),
         y_range=(0, geometry.n_freq),
-        tools="tap,reset",
-        active_tap="tap",
+        tools=tools,
+        active_tap="tap" if grading_enabled and on_tap is not None else None,
     )
     plot.rect(
         x="x",
@@ -204,16 +210,18 @@ def build_personal_grid(
     plot.xaxis.axis_label = "LST"
     plot.yaxis.axis_label = "Frequency"
 
-    def on_tap_event(event: Tap) -> None:
-        if event.x is None or event.y is None:
-            return
-        lst_idx = _index_from_coord(event.x, geometry.n_lst)
-        freq_idx = _index_from_coord(event.y, geometry.n_freq)
-        ds_id = geometry.dataset_id_at(lst_idx, freq_idx)
-        if ds_id is not None:
-            on_tap(ds_id)
+    if grading_enabled and on_tap is not None:
 
-    plot.on_event(Tap, on_tap_event)
+        def on_tap_event(event: Tap) -> None:
+            if event.x is None or event.y is None:
+                return
+            lst_idx = _index_from_coord(event.x, geometry.n_lst)
+            freq_idx = _index_from_coord(event.y, geometry.n_freq)
+            ds_id = geometry.dataset_id_at(lst_idx, freq_idx)
+            if ds_id is not None:
+                on_tap(ds_id)
+
+        plot.on_event(Tap, on_tap_event)
     plot._grader_source = source  # type: ignore[attr-defined]
     return plot
 
