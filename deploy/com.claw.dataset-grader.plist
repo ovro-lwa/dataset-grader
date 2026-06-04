@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.claw.dataset-grader</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/claw/code/dataset-grader</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/claw/code/dataset-grader/.venv/bin/panel</string>
+    <string>serve</string>
+    <string>src/dataset_grader/app.py</string>
+    <string>--address</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8765</string>
+    <string>--allow-websocket-origin=dataset-grader.local:8765</string>
+    <string>--allow-websocket-origin=127.0.0.1:8765</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>GRADER_MANIFEST</key>
+    <string>/Users/claw/code/dataset-grader/example/manifest.csv</string>
+    <key>GRADER_USERS_FILE</key>
+    <string>/Users/claw/code/dataset-grader/config/users.json</string>
+    <key>GRADER_DB_PATH</key>
+    <string>/Users/claw/code/dataset-grader/data/grader.sqlite</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/dataset-grader.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/dataset-grader.err.log</string>
+</dict>
+</plist>
