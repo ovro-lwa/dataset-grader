@@ -85,6 +85,7 @@ class DatasetGraderApp(param.Parameterized):
 
     def __init__(self, **params):
         super().__init__(**params)
+        _set_session_user(None)
         self._config = _load_config()
         self._reviewer_names = load_user_names(self._config.users_path)
         self._db = GraderDatabase(self._config.db_path)
@@ -111,6 +112,7 @@ class DatasetGraderApp(param.Parameterized):
         )
         self._refresh_catalog_button.on_click(self._on_refresh_catalog)
         self._status = pn.pane.Markdown("")
+        self._user_line = pn.pane.Markdown("_Not signed in_")
         self._hint = pn.pane.Markdown(self._hint_text(signed_in=False))
         self._day_param = pn.Param(
             self.param.day,
@@ -158,7 +160,12 @@ class DatasetGraderApp(param.Parameterized):
         )
 
     def _update_auth_ui(self) -> None:
-        signed_in = _get_session_user() is not None
+        user = _get_session_user()
+        signed_in = user is not None
+        if signed_in:
+            self._user_line.object = f"**Signed in:** {user.name}"
+        else:
+            self._user_line.object = "_Not signed in_"
         self._hint.object = self._hint_text(signed_in=signed_in)
 
     def _update_summary_plot(self) -> None:
@@ -289,23 +296,17 @@ class DatasetGraderApp(param.Parameterized):
 
     @property
     def view(self) -> pn.Column:
-        user = _get_session_user()
         header = pn.pane.Markdown(
             "## Dataset grader\n"
             "Sign in, pick a day, then grade cells below. "
             "Consensus grid shows all reviewers."
-        )
-        user_line = (
-            pn.pane.Markdown(f"**Signed in:** {user.name}")
-            if user
-            else pn.pane.Markdown("_Not signed in_")
         )
         controls = pn.Column(
             header,
             self._user_select,
             self._register_button,
             self._refresh_catalog_button,
-            user_line,
+            self._user_line,
             self._day_param,
             self._hint,
             self._status,
@@ -337,8 +338,16 @@ class DatasetGraderApp(param.Parameterized):
 
 
 def create_app() -> pn.Column:
+    """Build a fresh layout (used by tests and Panel per-session serving)."""
     return DatasetGraderApp().view
 
 
-app = create_app()
-app.servable()
+def _init_session() -> None:
+    """Mount a new app per browser session; clears any stale sign-in state."""
+    _set_session_user(None)
+    _session_root.objects = [create_app()]
+
+
+_session_root = pn.Column(sizing_mode="stretch_width")
+_session_root.servable()
+pn.state.onload(_init_session)
