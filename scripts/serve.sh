@@ -8,7 +8,7 @@ export GRADER_MANIFEST="${GRADER_MANIFEST:-$ROOT/example/manifest.csv}"
 export GRADER_USERS_FILE="${GRADER_USERS_FILE:-$ROOT/config/users.json}"
 export GRADER_DB_PATH="${GRADER_DB_PATH:-$ROOT/data/grader.sqlite}"
 
-HOST="${GRADER_HOST:-127.0.0.1}"
+HOST="${GRADER_HOST:-localhost}"
 PORT="${GRADER_PORT:-8765}"
 
 PYTHON="${ROOT}/.venv/bin/python"
@@ -25,5 +25,4 @@ exec "$PANEL" serve src/dataset_grader/app.py \
   --address "$HOST" \
   --port "$PORT" \
   --autoreload \
-  --show \
   "$@"
