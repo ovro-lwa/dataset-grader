@@ -1,6 +1,24 @@
 import pandas as pd
 
-from dataset_grader.summary import build_catalog_summary_plot, catalog_summary_table
+from dataset_grader.summary import (
+    build_catalog_summary_plot,
+    catalog_summary_table,
+    count_to_fill_color,
+)
+
+
+def test_count_to_fill_color_orders_light_to_dark():
+    light = count_to_fill_color(1, 5)
+    dark = count_to_fill_color(5, 5)
+    assert light != dark
+    # Blues256 increases in darkness with index
+    from bokeh.palettes import Blues256
+
+    assert Blues256.index(light) < Blues256.index(dark)
+
+
+def test_count_to_fill_color_zero_is_white():
+    assert count_to_fill_color(0, 10) == "#ffffff"
 
 
 def test_catalog_summary_table():

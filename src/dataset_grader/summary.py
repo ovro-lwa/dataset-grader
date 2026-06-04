@@ -3,11 +3,25 @@
 from __future__ import annotations
 
 import pandas as pd
-from bokeh.models import ColumnDataSource, FixedTicker, HoverTool, LinearColorMapper
+from bokeh.models import ColumnDataSource, FixedTicker, HoverTool
 from bokeh.palettes import Blues256
 from bokeh.plotting import figure
 
 from dataset_grader.grids import _axis_ticks, _cell_center, _freq_sort_key, _lst_sort_key
+
+EMPTY_FILL = "#ffffff"
+NONEMPTY_EDGE = "#424242"
+NONEMPTY_EDGE_WIDTH = 0.5
+
+
+def count_to_fill_color(count: int, max_count: int) -> str:
+    """Map subband count to fill: white at 0, light→dark blue for 1..max."""
+    if count <= 0:
+        return EMPTY_FILL
+    if max_count <= 1:
+        return Blues256[128]
+    idx = int((count - 1) / (max_count - 1) * (len(Blues256) - 1))
+    return Blues256[idx]
 
 
 def _format_subbands(frequencies: pd.Series) -> str:
@@ -110,10 +124,24 @@ def build_catalog_summary_plot(
 
     cell_days: list[str] = []
     cell_lsts: list[str] = []
+    fill_colors: list[str] = []
+    line_colors: list[str] = []
+    line_widths: list[float] = []
+    max_count = max((c for c in counts if c > 0), default=1)
+
     for day in day_labels:
         for lst in lst_labels:
             cell_days.append(day)
             cell_lsts.append(lst)
+
+    for count in counts:
+        fill_colors.append(count_to_fill_color(count, max_count))
+        if count > 0:
+            line_colors.append(NONEMPTY_EDGE)
+            line_widths.append(NONEMPTY_EDGE_WIDTH)
+        else:
+            line_colors.append(EMPTY_FILL)
+            line_widths.append(0.0)
 
     source = ColumnDataSource(
         data={
@@ -123,16 +151,10 @@ def build_catalog_summary_plot(
             "hover_text": hovers,
             "day": cell_days,
             "lst": cell_lsts,
+            "fill_color": fill_colors,
+            "line_color": line_colors,
+            "line_width": line_widths,
         }
-    )
-
-    max_count = max((c for c in counts if c > 0), default=1)
-    # White at zero; darkest blue at highest subband count
-    palette = ["#ffffff", *list(Blues256[64:])]
-    color_mapper = LinearColorMapper(
-        palette=palette,
-        low=0,
-        high=max(max_count, 1),
     )
 
     plot = figure(
@@ -148,8 +170,9 @@ def build_catalog_summary_plot(
         width=1.0,
         height=1.0,
         source=source,
-        fill_color={"field": "count", "transform": color_mapper},
-        line_width=0,
+        fill_color="fill_color",
+        line_color="line_color",
+        line_width="line_width",
     )
     hover_renderer = plot.rect(
         x="x",
