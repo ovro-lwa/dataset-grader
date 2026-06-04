@@ -174,16 +174,20 @@ def build_personal_grid(
         tools=tools,
         active_tap="tap" if grading_enabled and on_tap is not None else None,
     )
-    plot.rect(
+    cell_renderer = plot.rect(
         x="x",
         y="y",
         width=0.95,
         height=0.95,
         source=source,
         fill_color="fill_color",
+        fill_alpha=1.0,
         line_color="#424242",
         line_width=0.5,
     )
+    # Tap tool defaults wash out non-selected cells; grading needs full color always.
+    cell_renderer.nonselection_glyph = None
+    cell_renderer.selection_glyph = None
     hover_renderer = plot.rect(
         x="x",
         y="y",

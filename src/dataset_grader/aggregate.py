@@ -12,10 +12,10 @@ COLOR_RED = "#e53935"
 COLOR_ORANGE = "#fb8c00"
 
 PERSONAL_COLORS = {
-    "pass": "#a5d6a7",
-    "fail": "#ef9a9a",
-    "retry": "#ffcc80",
-    None: "#e0e0e0",
+    "pass": COLOR_GREEN,
+    "fail": COLOR_RED,
+    "retry": COLOR_ORANGE,
+    None: COLOR_GREY,
 }
 
 CONSENSUS_COLORS = {
