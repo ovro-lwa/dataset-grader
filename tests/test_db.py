@@ -6,13 +6,6 @@ import pytest
 from dataset_grader.db import GraderDatabase
 
 
-@pytest.fixture
-def db(tmp_path: Path) -> GraderDatabase:
-    database = GraderDatabase(tmp_path / "test.sqlite")
-    database.initialize()
-    return database
-
-
 def test_register_and_grade(db: GraderDatabase):
     user = db.register_user("alice")
     catalog = pd.DataFrame(

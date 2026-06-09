@@ -22,7 +22,7 @@ from dataset_grader.grids import (
     update_consensus_grid_colors,
     update_personal_grid_colors,
 )
-from dataset_grader.summary import build_catalog_summary_plot
+from dataset_grader.summary import build_catalog_summary_plot, build_good_summary_plot
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +125,11 @@ class DatasetGraderApp(param.Parameterized):
             sizing_mode="stretch_width",
             styles={"min-height": "640px"},
         )
+        self._good_summary_pane = pn.pane.Bokeh(
+            figure(),
+            sizing_mode="stretch_width",
+            styles={"min-height": "640px"},
+        )
         self._personal_pane = pn.pane.Bokeh(figure(), sizing_mode="stretch_width")
         self._consensus_pane = pn.pane.Bokeh(figure(), sizing_mode="stretch_width")
         self._catalog, _ = self._sync_catalog()
@@ -141,7 +146,7 @@ class DatasetGraderApp(param.Parameterized):
         count = self._db.sync_datasets(catalog)
         logger.info("Synced %s dataset rows from discovery", count)
         self._catalog = catalog
-        self._update_summary_plot()
+        self._update_summary_plots()
         return catalog, count
 
     @staticmethod
@@ -168,10 +173,18 @@ class DatasetGraderApp(param.Parameterized):
             self._user_line.object = "_Not signed in_"
         self._hint.object = self._hint_text(signed_in=signed_in)
 
-    def _update_summary_plot(self) -> None:
+    def _update_summary_plots(self) -> None:
         self._summary_pane.object = build_catalog_summary_plot(
             self._catalog,
             title="Catalog summary (datasets per day × LST)",
+            height=640,
+        )
+        datasets = self._db.all_datasets()
+        grades_df = self._db.all_grades()
+        self._good_summary_pane.object = build_good_summary_plot(
+            datasets,
+            grades_df,
+            title="Pass-only summary (all reviewers graded pass)",
             height=640,
         )
 
@@ -227,8 +240,10 @@ class DatasetGraderApp(param.Parameterized):
                 self._status.object = f"**{lst} · {freq}:** {label}"
         self._update_personal_plot(user)
         self._update_consensus_plot()
+        self._update_summary_plots()
 
     def _refresh_consensus(self) -> None:
+        self._update_summary_plots()
         if self.day is None or self._consensus_plot is None or self._geometry is None:
             return
         grades_df = self._db.all_grades_for_day(self.day)
@@ -301,6 +316,21 @@ class DatasetGraderApp(param.Parameterized):
             "Sign in, pick a day, then grade cells below. "
             "Consensus grid shows all reviewers."
         )
+        summary_row = pn.Row(
+            pn.Column(
+                pn.pane.Markdown("### Catalog summary"),
+                self._summary_pane,
+                sizing_mode="stretch_width",
+                styles={"flex": "1", "min-width": "0"},
+            ),
+            pn.Column(
+                pn.pane.Markdown("### Pass-only summary"),
+                self._good_summary_pane,
+                sizing_mode="stretch_width",
+                styles={"flex": "1", "min-width": "0"},
+            ),
+            sizing_mode="stretch_width",
+        )
         controls = pn.Column(
             header,
             self._user_select,
@@ -311,21 +341,10 @@ class DatasetGraderApp(param.Parameterized):
             self._hint,
             self._status,
             sizing_mode="stretch_width",
-            styles={"flex": "1", "min-width": "0"},
-        )
-        summary_panel = pn.Column(
-            pn.pane.Markdown("### Catalog summary"),
-            self._summary_pane,
-            sizing_mode="stretch_width",
-            styles={"flex": "1", "min-width": "0"},
-        )
-        top_row = pn.Row(
-            controls,
-            summary_panel,
-            sizing_mode="stretch_width",
         )
         main = pn.Column(
-            top_row,
+            summary_row,
+            controls,
             pn.pane.Markdown("### Your grading grid"),
             self._personal_pane,
             pn.pane.Markdown("### Consensus (hover for details)"),

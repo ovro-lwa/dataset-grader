@@ -2,8 +2,10 @@ import pandas as pd
 
 from dataset_grader.summary import (
     build_catalog_summary_plot,
+    build_good_summary_plot,
     catalog_summary_table,
     count_to_fill_color,
+    good_summary_table,
 )
 
 
@@ -63,3 +65,47 @@ def test_summary_empty_catalog():
     assert catalog_summary_table(catalog).empty
     plot = build_catalog_summary_plot(catalog)
     assert plot.title.text == "Datasets per day and LST"
+
+
+def test_good_summary_table():
+    datasets = pd.DataFrame(
+        [
+            {"dataset_id": 1, "day": "2024-12-28", "lst": "08h", "frequency": "74MHz"},
+            {"dataset_id": 2, "day": "2024-12-28", "lst": "08h", "frequency": "82MHz"},
+            {"dataset_id": 3, "day": "2024-12-28", "lst": "09h", "frequency": "74MHz"},
+        ]
+    )
+    grades = pd.DataFrame(
+        [
+            {"dataset_id": 1, "user_name": "alice", "grade": "pass"},
+            {"dataset_id": 1, "user_name": "bob", "grade": "pass"},
+            {"dataset_id": 2, "user_name": "alice", "grade": "pass"},
+            {"dataset_id": 2, "user_name": "bob", "grade": "retry"},
+            {"dataset_id": 3, "user_name": "alice", "grade": "fail"},
+        ]
+    )
+    summary = good_summary_table(datasets, grades)
+    assert len(summary) == 1
+    row = summary.iloc[0]
+    assert row["day"] == "2024-12-28"
+    assert row["lst"] == "08h"
+    assert row["count"] == 1
+    assert row["subbands"] == "74MHz"
+
+
+def test_build_good_summary_plot():
+    datasets = pd.DataFrame(
+        [
+            {"dataset_id": 1, "day": "2024-12-28", "lst": "08h", "frequency": "74MHz"},
+            {"dataset_id": 2, "day": "2024-12-29", "lst": "09h", "frequency": "82MHz"},
+        ]
+    )
+    grades = pd.DataFrame(
+        [
+            {"dataset_id": 1, "user_name": "alice", "grade": "pass"},
+            {"dataset_id": 2, "user_name": "alice", "grade": "retry"},
+        ]
+    )
+    plot = build_good_summary_plot(datasets, grades)
+    assert plot is not None
+    assert len(plot.renderers) >= 1

@@ -1,12 +1,13 @@
-"""Bokeh summary heatmap: dataset count by day vs LST."""
+"""Bokeh summary heatmaps: dataset counts by day vs LST."""
 
 from __future__ import annotations
 
 import pandas as pd
 from bokeh.models import ColumnDataSource, FixedTicker, HoverTool
-from bokeh.palettes import Blues256
+from bokeh.palettes import Blues256, Greens256
 from bokeh.plotting import figure
 
+from dataset_grader.aggregate import consensus_color
 from dataset_grader.grids import _axis_ticks, _cell_center, _freq_sort_key, _lst_sort_key
 
 EMPTY_FILL = "#ffffff"
@@ -15,16 +16,21 @@ NONEMPTY_EDGE_WIDTH = 0.5
 MAX_SUBBAND_COUNT = 15
 
 
-def count_to_fill_color(count: int, max_count: int = MAX_SUBBAND_COUNT) -> str:
-    """Map subband count to fill: white at 0, light→dark blue for 1..max (capped)."""
+def count_to_fill_color(
+    count: int,
+    max_count: int = MAX_SUBBAND_COUNT,
+    *,
+    palette: list[str] = Blues256,
+) -> str:
+    """Map subband count to fill: white at 0, light→dark for 1..max (capped)."""
     if count <= 0:
         return EMPTY_FILL
     capped = min(count, max_count)
     if max_count <= 1:
-        return Blues256[-1]
-    # Blues256 runs dark→light by index; invert so low counts are light.
-    idx = int((capped - 1) / (max_count - 1) * (len(Blues256) - 1))
-    return Blues256[(len(Blues256) - 1) - idx]
+        return palette[-1]
+    # Palettes run dark→light by index; invert so low counts are light.
+    idx = int((capped - 1) / (max_count - 1) * (len(palette) - 1))
+    return palette[(len(palette) - 1) - idx]
 
 
 def _format_subbands(frequencies: pd.Series) -> str:
@@ -54,14 +60,65 @@ def catalog_summary_table(catalog: pd.DataFrame) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
-def build_catalog_summary_plot(
-    catalog: pd.DataFrame,
+def _grades_by_dataset(grades_df: pd.DataFrame) -> dict[int, list[str]]:
+    if grades_df.empty:
+        return {}
+    grouped = grades_df.groupby("dataset_id")["grade"].agg(list)
+    return {int(ds_id): [str(g) for g in grades] for ds_id, grades in grouped.items()}
+
+
+def _is_good_dataset(grades: list[str]) -> bool:
+    return consensus_color(grades) == "green"
+
+
+def good_summary_table(
+    datasets: pd.DataFrame,
+    grades_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Count datasets with only pass grades (consensus green) by (day, lst)."""
+    required = ("dataset_id", "day", "lst", "frequency")
+    missing = set(required) - set(datasets.columns)
+    if missing:
+        raise ValueError(f"Datasets missing columns: {sorted(missing)}")
+    if datasets.empty:
+        return pd.DataFrame(columns=["day", "lst", "count", "subbands"])
+
+    by_dataset = _grades_by_dataset(grades_df)
+    good_rows = []
+    for row in datasets.itertuples(index=False):
+        grades = by_dataset.get(int(row.dataset_id), [])
+        if _is_good_dataset(grades):
+            good_rows.append(
+                {
+                    "day": str(row.day),
+                    "lst": str(row.lst),
+                    "frequency": str(row.frequency),
+                }
+            )
+    if not good_rows:
+        return pd.DataFrame(columns=["day", "lst", "count", "subbands"])
+
+    good_df = pd.DataFrame(good_rows)
+    grouped = (
+        good_df.groupby(["day", "lst"], as_index=False)["frequency"]
+        .agg(count="count", subbands=_format_subbands)
+    )
+    grouped["_lst_order"] = grouped["lst"].map(lambda v: _lst_sort_key(v)[0])
+    return grouped.sort_values(["day", "_lst_order", "lst"]).drop(
+        columns="_lst_order"
+    ).reset_index(drop=True)
+
+
+def _build_count_summary_plot(
+    summary: pd.DataFrame,
     *,
-    title: str = "Datasets per day and LST",
+    title: str,
+    count_label: str,
+    empty_message: str,
+    palette: list[str],
     width: int | None = None,
     height: int = 640,
 ) -> figure:
-    """Heatmap of dataset counts; hover lists subband (frequency) names."""
     figure_kwargs: dict = {
         "title": title,
         "height": height,
@@ -72,24 +129,12 @@ def build_catalog_summary_plot(
     if width is not None:
         figure_kwargs["width"] = width
 
-    if catalog.empty:
-        plot = figure(**figure_kwargs)
-        plot.text(
-            x=0,
-            y=0,
-            text=["No catalog data"],
-            text_align="center",
-            text_baseline="middle",
-        )
-        return plot
-
-    summary = catalog_summary_table(catalog)
     if summary.empty:
         plot = figure(**figure_kwargs)
         plot.text(
             x=0,
             y=0,
-            text=["No catalog data"],
+            text=[empty_message],
             text_align="center",
             text_baseline="middle",
         )
@@ -119,10 +164,12 @@ def build_catalog_summary_plot(
             ys.append(_cell_center(day_index[day]))
             counts.append(count)
             if count == 0:
-                hovers.append(f"Day {day}\nLST {lst}\nDatasets: 0\nSubbands: (none)")
+                hovers.append(
+                    f"Day {day}\nLST {lst}\n{count_label}: 0\nSubbands: (none)"
+                )
             else:
                 hovers.append(
-                    f"Day {day}\nLST {lst}\nDatasets: {count}\nSubbands: {subbands}"
+                    f"Day {day}\nLST {lst}\n{count_label}: {count}\nSubbands: {subbands}"
                 )
 
     cell_days: list[str] = []
@@ -136,7 +183,7 @@ def build_catalog_summary_plot(
             cell_lsts.append(lst)
 
     for count in counts:
-        fill_colors.append(count_to_fill_color(count))
+        fill_colors.append(count_to_fill_color(count, palette=palette))
         if count > 0:
             line_colors.append(NONEMPTY_EDGE)
             line_widths.append(NONEMPTY_EDGE_WIDTH)
@@ -204,3 +251,81 @@ def build_catalog_summary_plot(
     plot.yaxis.axis_label = "Day"
 
     return plot
+
+
+def build_catalog_summary_plot(
+    catalog: pd.DataFrame,
+    *,
+    title: str = "Datasets per day and LST",
+    width: int | None = None,
+    height: int = 640,
+) -> figure:
+    """Heatmap of dataset counts; hover lists subband (frequency) names."""
+    figure_kwargs: dict = {
+        "title": title,
+        "height": height,
+        "x_axis_label": "LST",
+        "y_axis_label": "Day",
+        "sizing_mode": "scale_width",
+    }
+    if width is not None:
+        figure_kwargs["width"] = width
+
+    if catalog.empty:
+        return _build_count_summary_plot(
+            pd.DataFrame(columns=["day", "lst", "count", "subbands"]),
+            title=title,
+            count_label="Datasets",
+            empty_message="No catalog data",
+            palette=Blues256,
+            width=width,
+            height=height,
+        )
+
+    summary = catalog_summary_table(catalog)
+    return _build_count_summary_plot(
+        summary,
+        title=title,
+        count_label="Datasets",
+        empty_message="No catalog data",
+        palette=Blues256,
+        width=width,
+        height=height,
+    )
+
+
+def build_good_summary_plot(
+    datasets: pd.DataFrame,
+    grades_df: pd.DataFrame,
+    *,
+    title: str = "Pass-only datasets per day and LST",
+    width: int | None = None,
+    height: int = 640,
+) -> figure:
+    """Heatmap of datasets where every reviewer grade is pass."""
+    if datasets.empty:
+        return _build_count_summary_plot(
+            pd.DataFrame(columns=["day", "lst", "count", "subbands"]),
+            title=title,
+            count_label="Pass-only datasets",
+            empty_message="No dataset data",
+            palette=Greens256,
+            width=width,
+            height=height,
+        )
+
+    day_lst = datasets[["day", "lst"]].drop_duplicates()
+    summary = good_summary_table(datasets, grades_df)
+    frame = day_lst.merge(summary, on=["day", "lst"], how="left")
+    frame["count"] = frame["count"].fillna(0).astype(int)
+    frame["subbands"] = frame["subbands"].fillna("")
+
+    return _build_count_summary_plot(
+        frame,
+        title=title,
+        count_label="Pass-only datasets",
+        empty_message="No pass-only datasets",
+        palette=Greens256,
+        width=width,
+        height=height,
+    )

@@ -136,6 +136,19 @@ class GraderDatabase:
             ).fetchall()
         return [str(r["day"]) for r in rows]
 
+    def dataset_ids_for_day_lst(self, day: str, lst: str) -> list[int]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id
+                FROM datasets
+                WHERE day = ? AND lst = ?
+                ORDER BY frequency
+                """,
+                (day, lst),
+            ).fetchall()
+        return [int(r["id"]) for r in rows]
+
     def datasets_for_day(self, day: str) -> pd.DataFrame:
         with self._connect() as conn:
             rows = conn.execute(
@@ -194,6 +207,49 @@ class GraderDatabase:
                 (user_id, day),
             ).fetchall()
         return {int(r["dataset_id"]): str(r["grade"]) for r in rows}
+
+    def all_datasets(self) -> pd.DataFrame:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, day, lst, frequency
+                FROM datasets
+                ORDER BY day, lst, frequency
+                """
+            ).fetchall()
+        return pd.DataFrame(
+            [
+                {
+                    "dataset_id": int(r["id"]),
+                    "day": str(r["day"]),
+                    "lst": str(r["lst"]),
+                    "frequency": str(r["frequency"]),
+                }
+                for r in rows
+            ]
+        )
+
+    def all_grades(self) -> pd.DataFrame:
+        """Return columns: dataset_id, user_name, grade."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT g.dataset_id, u.name AS user_name, g.grade
+                FROM grades g
+                JOIN users u ON u.id = g.user_id
+                ORDER BY g.dataset_id, u.name
+                """
+            ).fetchall()
+        return pd.DataFrame(
+            [
+                {
+                    "dataset_id": int(r["dataset_id"]),
+                    "user_name": str(r["user_name"]),
+                    "grade": str(r["grade"]),
+                }
+                for r in rows
+            ]
+        )
 
     def all_grades_for_day(self, day: str) -> pd.DataFrame:
         """Return columns: dataset_id, user_name, grade."""
