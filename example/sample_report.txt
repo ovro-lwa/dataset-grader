@@ -1,0 +1,13 @@
+--- 00h (0/1 science ready) ---
+  2024-12-18  [D]  Outlier: rejected by Phase 3 two-pass co-add
+--- 01h (8/10 science ready) ---
+  2024-12-18  [A]  Science ready
+  2024-12-19  [A]  Science ready
+  2024-12-20  [A]  Science ready
+  2024-12-21  [A]  Science ready
+  2024-12-22  [A]  Science ready
+  2024-12-24  [A]  Science ready
+  2024-12-26  [D]  Bad imaging (2024-12-26)
+  2024-12-27  [D]  Outlier: rejected by Phase 3 two-pass co-add
+  2024-12-28  [A]  Science ready
+  2024-12-29  [A]  Science ready
